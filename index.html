@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深入浅出提示词工程 (Prompt Engineering) - 演示模式</title>
+    <script src="https://cdn.tailwindcss.com/3.4.3"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* 基本样式保持不变 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 3px; }
+        html.dark ::-webkit-scrollbar-thumb { background-color: rgba(75, 85, 99, 0.5); }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f9fafb; /* bg-gray-50 */
+        }
+        html.dark body {
+             background-color: #030712; /* dark:bg-gray-950 */
+        }
+
+        .page-container {
+            flex-grow: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease-in-out, visibility 0s linear 0.5s;
+            overflow-y: auto;
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+             color: #1f2937; /* text-gray-800 */
+        }
+         html.dark .page {
+            color: #e5e7eb; /* dark:text-gray-200 */
+        }
+
+
+        .page.active {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease-in-out;
+            z-index: 10;
+        }
+
+        .fade-in-item {
+            opacity: 0;
+            transform: translateY(15px);
+            transition: opacity 0.6s ease-out 0.3s, transform 0.6s ease-out 0.3s;
+        }
+        .page.active .fade-in-item { opacity: 1; transform: translateY(0); }
+        .page.active .fade-in-item:nth-child(2) { transition-delay: 0.4s; }
+        .page.active .fade-in-item:nth-child(3) { transition-delay: 0.5s; }
+        .page.active .fade-in-item:nth-child(4) { transition-delay: 0.6s; }
+
+        .lyric-line { opacity: 0; transition: opacity 0.5s ease-in-out; }
+        .page.active #lyrics-container .lyric-line.active { opacity: 1; }
+
+        .hover-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            border: 1px solid transparent;
+            background-color: white;
+        }
+         html.dark .hover-card {
+            background-color: #111827; /* dark:bg-gray-900 */
+             border-color: #374151; /* dark:border-gray-700 */
+        }
+
+        .hover-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+            border-color: rgba(209, 213, 219, 0.5); /* gray-300/50 */
+        }
+        html.dark .hover-card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            border-color: rgba(75, 85, 99, 0.8); /* gray-600/80 */
+        }
+
+        .hover-button {
+            transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+        }
+        .hover-button:hover:not(:disabled) { transform: scale(1.03); }
+        .hover-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .highlight-text {
+            background: linear-gradient(to right, #a855f7, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 600;
+        }
+        html.dark .highlight-text {
+            background: linear-gradient(to right, #c084fc, #f472b6);
+             -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-button {
+            @apply p-2 rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-gray-950 transition-colors duration-300 hover-button;
+        }
+
+        /* Card specific dark mode background */
+        .dark .dark\:bg-gray-900 { background-color: #111827; }
+        .dark .dark\:border-gray-800 { border-color: #1f2937; }
+        .dark .dark\:text-white { color: #f9fafb; }
+        .dark .dark\:text-gray-300 { color: #d1d5db; }
+        .dark .dark\:text-gray-400 { color: #9ca3af; }
+        .dark .dark\:text-gray-500 { color: #6b7280; }
+        .dark .dark\:bg-gray-800 { background-color: #1f2937; }
+        .dark .dark\:bg-gray-950 { background-color: #030712;}
+        .dark .dark\:bg-yellow-900\/30 { background-color: rgba(113, 63, 18, 0.3); }
+        .dark .dark\:border-yellow-600 { border-color: #d97706; }
+        .dark .dark\:text-yellow-200 { color: #fef08a; }
+        .dark .dark\:text-yellow-300 { color: #fde047; }
+        .dark .dark\:text-yellow-400 { color: #facc15; }
+
+
+    </style>
+</head>
+<body>
+
+    <!-- 导航/模式切换 -->
+    <nav class="sticky top-0 z-50 bg-gray-50/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex-shrink-0 flex items-center">
+                    <i class="fas fa-brain text-2xl text-purple-600 dark:text-purple-400 mr-2"></i>
+                    <span class="text-xl font-semibold text-gray-900 dark:text-white">提示词工程入门</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                     <div id="page-indicator" class="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                        <span id="current-page">1</span> / <span id="total-pages">N</span>
+                    </div>
+                    <button id="theme-toggle" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:focus:ring-offset-gray-950 transition-colors duration-300 hover-button" aria-label="切换深色/浅色模式">
+                        <i id="theme-icon" class="fas text-lg"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区域 - 页面容器 -->
+    <main class="page-container max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+         <!-- Page 0: 开场白 (大纲 0) -->
+        <div id="page-0" class="page active">
+             <div class="text-center max-w-3xl w-full">
+                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-gray-900 dark:text-white mb-6 fade-in-item">
+                    欢迎探索 <span class="highlight-text">提示词工程</span> 的世界
+                </h1>
+                <p class="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto fade-in-item">
+                    让我们一起掌握与 AI 对话的艺术。
+                </p>
+                 <div class="mt-12 text-gray-400 dark:text-gray-600 fade-in-item">
+                    <i class="fas fa-chevron-down text-2xl animate-bounce"></i> <span class="text-sm ml-2">点击下方箭头或按 → 继续</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 1: 提示词工程是什么？ (大纲 1, 3) -->
+        <div id="page-1" class="page">
+             <div class="text-center max-w-4xl w-full">
+                 <div class="mb-12 fade-in-item">
+                     <i class="fas fa-question-circle text-7xl text-purple-600 dark:text-purple-400 mb-4"></i>
+                    <h2 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                        提示词工程是<span class="text-purple-600 dark:text-purple-400">_</span>
+                    </h2>
+                     <p class="mt-4 text-lg text-gray-600 dark:text-gray-400">你会用哪四个字来定义它？</p>
+                </div>
+                 <p class="mt-8 text-center text-gray-600 dark:text-gray-400 fade-in-item">
+                    (Few-Shot & 精确描述)
+                </p>
+            </div>
+        </div>
+
+        <!-- Page 2: AI 如何定义提示词工程 (大纲 2) -->
+        <div id="page-2" class="page">
+             <div class="max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item"><i class="fas fa-robot mr-2 text-purple-500"></i>AI 眼中的提示词工程</h3>
+                <div class="space-y-6">
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="font-medium text-gray-700 dark:text-gray-300 mb-2"><i class="fab fa-galactic-republic mr-2 text-purple-500"></i>GPT-4o:</p>
+                        <p class="text-gray-600 dark:text-gray-400">提示词工程就是与 AI 对话的艺术。</p>
+                    </div>
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="font-medium text-gray-700 dark:text-gray-300 mb-2"><i class="fab fa-google mr-2 text-green-500"></i>Gemini 2.5 Pro:</p>
+                        <p class="text-gray-600 dark:text-gray-400">结构化地、有策略地与 AI 对话，以最大限度地发挥其能力，获得高质量、可靠和有用的结果。</p>
+                    </div>
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="font-medium text-gray-700 dark:text-gray-300 mb-2"><i class="fab fa-autoprefixer mr-2 text-blue-500"></i>Claude 3.7 Sonnet:</p>
+                        <p class="text-gray-600 dark:text-gray-400">设计和优化输入给人工智能模型的提示词或指令的艺术和科学，以获得最佳、最准确的输出结果。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 2: AI 如何定义提示词工程 (大纲 2) -->
+        <div id="page-2.1" class="page">
+             <div class="max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item"><i class="fas fa-robot mr-2 text-purple-500"></i>AI 的四字描述</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center w-full fade-in-item">
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="text-sm font-semibold text-purple-600 dark:text-purple-400 mb-2">GPT-4:</p>
+                        <p class="text-3xl font-bold text-gray-900 dark:text-white">语言编程</p>
+                    </div>
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="text-sm font-semibold text-green-600 dark:text-green-400 mb-2">Gemini 2.5 Pro:</p>
+                        <p class="text-3xl font-bold text-gray-900 dark:text-white">精准引导</p>
+                    </div>
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <p class="text-sm font-semibold text-blue-600 dark:text-blue-400 mb-2">Claude 3.7 Sonnet:</p>
+                        <p class="text-3xl font-bold text-gray-900 dark:text-white">指令精调</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Page 3: AI (大模型) 是什么 (大纲 4, 5) -->
+        <div id="page-3" class="page">
+             <div class="max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-8 text-center fade-in-item"><i class="fas fa-puzzle-piece mr-2 text-purple-500"></i>AI (大模型) 的本质</h3>
+                <div class="flex flex-col md:flex-row items-center gap-8 bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 fade-in-item">
+                    <div class="w-full md:w-1/2 text-center md:text-left">
+                         <p class="text-lg text-gray-700 dark:text-gray-300 mb-4 fade-in-item">一个<strong class="text-purple-600 dark:text-purple-400">极其庞大</strong>的、基于概率预测<strong class="text-purple-600 dark:text-purple-400">下一个词</strong>的系统。</p>
+                         <p class="text-gray-600 dark:text-gray-400 fade-in-item">像超级复杂的 Excel，根据上文计算下一个最可能的文字。</p>
+                         <p class="mt-4 text-sm text-gray-500 dark:text-gray-500 fade-in-item">关键：<strong class="font-semibold">概率预测</strong> & <strong class="font-semibold">注意力机制</strong>。微小变动影响巨大。</p>
+                    </div>
+                     <div class="w-full md:w-1/2 flex justify-center items-center text-6xl text-purple-300 dark:text-purple-700 opacity-50 fade-in-item">
+                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-32 h-32">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                     </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="page-3.1" class="page">
+             <div class="max-w-4xl w-full">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10 text-center fade-in-item">
+                    <i class="fas fa-magic mr-2 text-purple-500"></i>只能蹦一个词？
+                </h3>
+
+                <div class="flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16">
+                    <div class="w-full lg:w-1/2 text-center lg:text-left space-y-6">
+                        <div class="fade-in-item">
+                            <h4 class="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-2">1. 超级“接龙”大师</h4>
+                            <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                想象一个超级厉害的“文字接龙”玩家。你给它一段话，它唯一的目标就是猜出<strong class="font-semibold text-indigo-500 dark:text-indigo-300">最可能</strong>跟在后面的<strong class="font-semibold text-indigo-500 dark:text-indigo-300">那一个词</strong>是什么。它会基于海量学习，给出一堆候选词以及它们出现的<strong class="font-semibold">概率</strong>。
+                            </p>
+                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">（就像手机输入法的联想功能，但强大亿万倍！）</p>
+                        </div>
+
+                        <div class="fade-in-item">
+                             <h4 class="text-xl font-semibold text-purple-600 dark:text-purple-400 mb-2">2. “阅读理解”高手 (注意力机制)</h4>
+                             <p class="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                 它怎么猜呢？它会<strong class="font-semibold text-teal-500 dark:text-teal-300">回顾</strong>你给的所有<strong class="font-semibold text-teal-500 dark:text-teal-300">前面的内容</strong>，并判断哪些词对预测“下一个词”<strong class="font-semibold">更重要</strong>，给予更多“关注”（这就是<strong class="font-semibold">自注意力机制 Self-Attention</strong>）。每个前面的词都可能影响最终的概率分布。
+                             </p>
+                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">（所以，前面哪怕改一个字，后面的结果都可能完全不同！）</p>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="page-3.2" class="page">
+            <div class="max-w-4xl w-full">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10 text-center fade-in-item">
+                    <i class="fas fa-magic mr-2 text-purple-500"></i>接龙大师+蝴蝶效应？ (第1步)
+                </h3>
+                <div class="flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16">
+                    <div class="w-full lg:w-1/2 flex justify-center items-center fade-in-item">
+                        <svg viewBox="0 0 450 250" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-lg h-auto">
+                            <style>
+                                /* SVG styles remain the same */
+                                .word-box { fill: #e5e7eb; stroke: #9ca3af; stroke-width: 1; }
+                                .word-text { font-family: sans-serif; font-size: 14px; fill: #374151; }
+                                .attention-line { stroke: #a78bfa; stroke-width: 1.5; stroke-dasharray: 3, 2; opacity: 0.8; }
+                                .next-word-q { fill: #f3e8ff; stroke: #a855f7; stroke-width: 1.5; }
+                                .next-word-text { font-family: sans-serif; font-size: 18px; font-weight: bold; fill: #a855f7; }
+                                .prob-bar { fill: #60a5fa; }
+                                .prob-text { font-family: sans-serif; font-size: 10px; fill: #4b5563; }
+                                .label-text { font-family: sans-serif; font-size: 11px; fill: #6b7280; }
+                                .confirmed-word-box { fill: #d1fae5; stroke: #10b981; stroke-width: 1.2; }
+
+                                @media (prefers-color-scheme: dark) {
+                                    .word-box { fill: #374151; stroke: #6b7280; }
+                                    .word-text { fill: #e5e7eb; }
+                                    .attention-line { stroke: #c084fc; }
+                                    .next-word-q { fill: #581c87; stroke: #c084fc; }
+                                    .next-word-text { fill: #c084fc; }
+                                    .prob-bar { fill: #93c5fd; }
+                                    .prob-text { fill: #d1d5db; }
+                                    .label-text { fill: #9ca3af; }
+                                    .confirmed-word-box { fill: #064e3b; stroke: #34d399; }
+                                }
+                                /* Ensure styles apply in dark mode regardless of media query for direct class usage */
+                                html.dark .word-box { fill: #374151; stroke: #6b7280; }
+                                html.dark .word-text { fill: #e5e7eb; }
+                                html.dark .attention-line { stroke: #c084fc; }
+                                html.dark .next-word-q { fill: #581c87; stroke: #c084fc; }
+                                html.dark .next-word-text { fill: #c084fc; }
+                                html.dark .prob-bar { fill: #93c5fd; }
+                                html.dark .prob-text { fill: #d1d5db; }
+                                html.dark .label-text { fill: #9ca3af; }
+                                html.dark .confirmed-word-box { fill: #064e3b; stroke: #34d399; }
+
+                            </style>
+
+                            {/* Input words */}
+                            <rect x="10" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="40" y="70" text-anchor="middle" class="word-text">今天</text>
+                            <rect x="80" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="110" y="70" text-anchor="middle" class="word-text">天气</text>
+                            <rect x="150" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="180" y="70" text-anchor="middle" class="word-text">真</text>
+
+                            {/* Prediction point */}
+                            <rect x="220" y="45" width="50" height="40" rx="8" class="next-word-q"/>
+                            <text x="245" y="72" text-anchor="middle" class="next-word-text">?</text>
+
+                            {/* Attention Lines */}
+                            <path d="M 40 85 Q 135 110 230 85" fill="none" class="attention-line"/>
+                            <path d="M 110 85 Q 170 95 230 85" fill="none" class="attention-line"/>
+                            <path d="M 180 85 Q 205 88 230 85" fill="none" class="attention-line" stroke-width="2.5"/>
+
+                            {/* Probability outputs */}
+                            {/* --- 修正 label x 坐标 --- */}
+                            <text x="365" y="130" text-anchor="middle" class="label-text">预测下一个词的概率</text>
+
+                            {/* Option 1: 好 */}
+                            <rect x="280" y="140" width="110" height="15" class="prob-bar" />
+                            <text x="275" y="151" text-anchor="end" class="prob-text">好:</text>
+                            {/* --- 修正 text x 坐标 --- */}
+                            <text x="395" y="151" text-anchor="start" class="prob-text">75%</text>
+
+                            {/* Option 2: 不错 */}
+                            <rect x="280" y="165" width="60" height="15" class="prob-bar" style="fill: #93c5fd; opacity: 0.7;"/>
+                            <text x="275" y="176" text-anchor="end" class="prob-text">不错:</text>
+                            <text x="345" y="176" text-anchor="start" class="prob-text">20%</text>
+
+                            {/* Option 3: 热 */}
+                            <rect x="280" y="190" width="15" height="15" class="prob-bar" style="fill: #bfdbfe; opacity: 0.5;"/>
+                            <text x="275" y="201" text-anchor="end" class="prob-text">热:</text>
+                            <text x="300" y="201" text-anchor="start" class="prob-text">5%</text>
+
+                            {/* Labels */}
+                            <text x="115" y="35" text-anchor="middle" class="label-text">输入 (上文)</text>
+                            <text x="165" y="115" text-anchor="middle" class="label-text" transform="rotate(-10 165,115)">关注所有前面的词</text>
+                            <path d="M130 105 Q 140 90 150 105" fill="none" stroke="#6b7280" stroke-width="1"/>
+                            <path d="M145 107 L 150 105 L 152 110" fill="none" stroke="#6b7280" stroke-width="1"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-3.3" class="page">
+            <div class="max-w-4xl w-full">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10 text-center fade-in-item">
+                    <i class="fas fa-sync-alt fa-spin mr-2 text-purple-500" style="animation-duration: 3s;"></i> 接龙大师+蝴蝶效应...然后，再接一个词！ (第2步)
+                </h3>
+                <div class="flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-16">
+                    <div class="w-full lg:w-1/2 flex justify-center items-center fade-in-item">
+                        <svg viewBox="0 0 450 250" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-lg h-auto">
+                            <style>
+                                /* Styles are inherited or redefined if needed, using the same classes */
+                                 /* Re-declaring just in case, though CSS should cascade */
+                                .word-box { fill: #e5e7eb; stroke: #9ca3af; stroke-width: 1; }
+                                .word-text { font-family: sans-serif; font-size: 14px; fill: #374151; }
+                                .attention-line { stroke: #a78bfa; stroke-width: 1.5; stroke-dasharray: 3, 2; opacity: 0.7; }
+                                .next-word-q { fill: #f3e8ff; stroke: #a855f7; stroke-width: 1.5; }
+                                .next-word-text { font-family: sans-serif; font-size: 18px; font-weight: bold; fill: #a855f7; }
+                                .prob-bar { fill: #60a5fa; }
+                                .prob-text { font-family: sans-serif; font-size: 10px; fill: #4b5563; }
+                                .label-text { font-family: sans-serif; font-size: 11px; fill: #6b7280; }
+                                .confirmed-word-box { fill: #d1fae5; stroke: #10b981; stroke-width: 1.2; }
+
+                                @media (prefers-color-scheme: dark) {
+                                    .word-box { fill: #374151; stroke: #6b7280; }
+                                    .word-text { fill: #e5e7eb; }
+                                    .attention-line { stroke: #c084fc; }
+                                    .next-word-q { fill: #581c87; stroke: #c084fc; }
+                                    .next-word-text { fill: #c084fc; }
+                                    .prob-bar { fill: #93c5fd; }
+                                    .prob-text { fill: #d1d5db; }
+                                    .label-text { fill: #9ca3af; }
+                                    .confirmed-word-box { fill: #064e3b; stroke: #34d399; }
+                                }
+                                 html.dark .word-box { fill: #374151; stroke: #6b7280; }
+                                html.dark .word-text { fill: #e5e7eb; }
+                                html.dark .attention-line { stroke: #c084fc; }
+                                html.dark .next-word-q { fill: #581c87; stroke: #c084fc; }
+                                html.dark .next-word-text { fill: #c084fc; }
+                                html.dark .prob-bar { fill: #93c5fd; }
+                                html.dark .prob-text { fill: #d1d5db; }
+                                html.dark .label-text { fill: #9ca3af; }
+                                html.dark .confirmed-word-box { fill: #064e3b; stroke: #34d399; }
+                            </style>
+
+                            {/* Input words - now including "好" */}
+                            <rect x="10" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="40" y="70" text-anchor="middle" class="word-text">今天</text>
+                            <rect x="80" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="110" y="70" text-anchor="middle" class="word-text">天气</text>
+                            <rect x="150" y="50" width="60" height="30" rx="5" class="word-box"/>
+                            <text x="180" y="70" text-anchor="middle" class="word-text">真</text>
+                            <rect x="220" y="50" width="60" height="30" rx="5" class="confirmed-word-box"/>
+                            <text x="250" y="70" text-anchor="middle" class="word-text">好</text>
+
+                            {/* Prediction point */}
+                            <rect x="290" y="45" width="50" height="40" rx="8" class="next-word-q"/>
+                            <text x="315" y="72" text-anchor="middle" class="next-word-text">?</text>
+
+                            {/* Attention Lines */}
+                            <path d="M 40 85 Q 170 120 300 85" fill="none" class="attention-line" stroke-width="1"/>
+                            <path d="M 110 85 Q 200 105 300 85" fill="none" class="attention-line"/>
+                            <path d="M 180 85 Q 240 95 300 85" fill="none" class="attention-line"/>
+                            <path d="M 250 85 Q 275 88 300 85" fill="none" class="attention-line" stroke-width="2.5"/>
+
+                            {/* Probability outputs - NEW PREDICTIONS */}
+                             {/* --- 修正 label x 坐标 --- */}
+                            <text x="390" y="130" text-anchor="middle" class="label-text">基于新上文的预测</text>
+
+                            {/* Option 1: 啊 */}
+                            <rect x="330" y="140" width="100" height="15" class="prob-bar" />
+                            <text x="325" y="151" text-anchor="end" class="prob-text">啊:</text>
+                            {/* --- 修正 text x 坐标 --- */}
+                            <text x="435" y="151" text-anchor="start" class="prob-text">60%</text>
+
+                            {/* Option 2: . (period) */}
+                            <rect x="330" y="165" width="50" height="15" class="prob-bar" style="fill: #93c5fd; opacity: 0.7;"/>
+                            <text x="325" y="176" text-anchor="end" class="prob-text">.:</text>
+                            <text x="385" y="176" text-anchor="start" class="prob-text">30%</text>
+
+                            {/* Option 3: ! */}
+                            <rect x="330" y="190" width="17" height="15" class="prob-bar" style="fill: #bfdbfe; opacity: 0.5;"/>
+                            <text x="325" y="201" text-anchor="end" class="prob-text">!:</text>
+                            <text x="352" y="201" text-anchor="start" class="prob-text">10%</text>
+
+                            {/* Labels */}
+                            <text x="145" y="35" text-anchor="middle" class="label-text">输入 (更新后的上文)</text>
+                            <text x="220" y="115" text-anchor="middle" class="label-text" transform="rotate(-10 220,115)">再次关注所有前面的词</text>
+                            <path d="M190 105 Q 200 90 210 105" fill="none" stroke="#6b7280" stroke-width="1"/>
+                            <path d="M205 107 L 210 105 L 212 110" fill="none" stroke="#6b7280" stroke-width="1"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 4: 人与 AI 的相似性 (大纲 6, 7) -->
+        <div id="page-4" class="page">
+            <div class="text-center max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-4 fade-in-item"><i class="fas fa-user-friends mr-2 text-purple-500"></i>用人来对比？</h3>
+                 <p class="text-lg text-gray-600 dark:text-gray-400 mb-12 fade-in-item">AI有点像人脑，接收上文，自动“脑补”下文。</p>
+                 <div class="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 fade-in-item">
+                    <p class="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-8 fade-in-item">
+                        是谁<span class="text-purple-600 dark:text-purple-400">_</span>
+                    </p>
+                    <p class="text-lg text-gray-600 dark:text-gray-400 mb-8 fade-in-item">当你听到这两个字？</p>
+                    <div id="lyrics-container" class="space-y-3 text-left max-w-md mx-auto text-gray-700 dark:text-gray-300 fade-in-item">
+                        <p class="lyric-line"><i class="fas fa-music mr-2 text-blue-500"></i>普通: <span class="italic">“在耳边，说，爱我永不变”</span></p>
+                        <p class="lyric-line"><i class="fas fa-feather-alt mr-2 text-green-500"></i>文艺: <span class="italic">“在敲打我窗”</span></p>
+                        <p class="lyric-line"><i class="fas fa-grin-squint-tears mr-2 text-yellow-500"></i>正常: <span class="italic">“送你来到我身边”</span></p>
+                        <p class="lyric-line"><i class="fas fa-fighter-jet mr-2 text-red-500"></i>逗逼: <span class="italic">“在唱歌，温暖了寂寞”</span></p>
+                    </div>
+                     <p class="mt-8 text-sm text-gray-500 dark:text-gray-500 fade-in-item">不同人，不同联想；AI 也一样。</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="page-4.1" class="page">
+            <div class="max-w-4xl w-full text-center">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 fade-in-item">
+                    <i class="fas fa-sliders-h mr-2 text-purple-500"></i>Prompt工程的本质？
+                </h3>
+
+                <div class="flex flex-col lg:flex-row items-center gap-12">
+                    <div class="lg:w-1/2 space-y-5 text-center lg:text-left fade-in-item">
+                        <p class="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
+                            就像我们对"是谁_"的反应不同，AI 的每个回答（每个词）都受到<strong class="highlight-text">两大因素</strong>的共同作用：
+                        </p>
+                        <ol class="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-left pl-4">
+                            <li>
+                                <strong class="font-semibold text-blue-600 dark:text-blue-400">你给出的上下文 (Prompt):</strong>
+                                它像导航一样，直接<strong class="font-semibold">引导</strong> AI 当前的思考方向和任务目标。
+                            </li>
+                            <li>
+                                <strong class="font-semibold text-purple-600 dark:text-purple-400">它庞大的训练数据 (Training Data):</strong>
+                                如同 AI 的<strong class="font-semibold">知识库和性格底色</strong>，塑造了它的语言模式、事实储备、潜在风格乃至偏见。
+                            </li>
+                        </ol>
+                        <p class="text-lg text-gray-700 dark:text-gray-300 leading-relaxed pt-3">
+                            <i class="fas fa-lightbulb mr-1 text-yellow-500"></i><strong class="text-green-600 dark:text-green-400">提示词工程 (Prompt Engineering) 的本质</strong>，就是理解并设计<strong class="font-semibold text-blue-500 dark:text-blue-300">提示词 (输入)</strong>，去影响和利用这两个因素，从而最大程度地引导 AI 产生我们<strong class="highlight-text">预期</strong>的、高质量的输出。
+                        </p>
+                    </div>
+
+                    <div class="lg:w-1/2 w-full flex justify-center items-center fade-in-item">
+                        <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" class="w-full max-w-md h-auto">
+                            <style>
+                                .prompt-box { fill: #dbeafe; stroke: #60a5fa; } /* blue-100 / blue-400 */
+                                .prompt-text { fill: #1e40af; font-size:12px; font-family: sans-serif;} /* blue-800 */
+                                .training-base { fill: #f3e8ff; stroke: #a855f7; opacity: 0.6;} /* purple-100 / purple-500 */
+                                .training-text { fill: #581c87; font-size:11px; font-family: sans-serif; font-style: italic;} /* purple-900 */
+                                .ai-core { fill: #fef3c7; stroke: #f59e0b; } /* amber-100 / amber-500 */
+                                .ai-text { fill: #b45309; font-weight: bold; font-size:13px; font-family: sans-serif;} /* amber-700 */
+                                .output-box { fill: #dcfce7; stroke: #22c55e; } /* green-100 / green-500 */
+                                .output-text { fill: #15803d; font-size:12px; font-family: sans-serif;} /* green-700 */
+                                .arrow-line { stroke: #6b7280; stroke-width: 1.5; marker-end: url(#arrowhead); } /* gray-500 */
+                                .pe-label { fill: #16a34a; font-size: 12px; font-weight: bold; font-family: sans-serif;} /* green-600 */
+
+                                /* Dark Mode Styles */
+                                @media (prefers-color-scheme: dark) {
+                                    .prompt-box { fill: #1e3a8a; stroke: #93c5fd; } /* blue-900 / blue-300 */
+                                    .prompt-text { fill: #bfdbfe; } /* blue-200 */
+                                    .training-base { fill: #3b0764; stroke: #c084fc; opacity: 0.7; } /* purple-950 / purple-400 */
+                                    .training-text { fill: #e9d5ff; } /* purple-200 */
+                                    .ai-core { fill: #78350f; stroke: #fcd34d; } /* amber-900 / amber-300 */
+                                    .ai-text { fill: #fefce8; } /* amber-50 */
+                                    .output-box { fill: #14532d; stroke: #4ade80; } /* green-900 / green-400 */
+                                    .output-text { fill: #bbf7d0; } /* green-200 */
+                                    .arrow-line { stroke: #9ca3af; } /* gray-400 */
+                                    .pe-label { fill: #22c55e; } /* green-500 */
+                                }
+                                html.dark .prompt-box { fill: #1e3a8a; stroke: #93c5fd; }
+                                html.dark .prompt-text { fill: #bfdbfe; }
+                                html.dark .training-base { fill: #3b0764; stroke: #c084fc; opacity: 0.7; }
+                                html.dark .training-text { fill: #e9d5ff; }
+                                html.dark .ai-core { fill: #78350f; stroke: #fcd34d; }
+                                html.dark .ai-text { fill: #fefce8; }
+                                html.dark .output-box { fill: #14532d; stroke: #4ade80; }
+                                html.dark .output-text { fill: #bbf7d0; }
+                                html.dark .arrow-line { stroke: #9ca3af; }
+                                html.dark .pe-label { fill: #22c55e; }
+                            </style>
+
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+                                </marker>
+                                <marker id="arrowhead-dark" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#9ca3af" />
+                                </marker>
+                                <style>
+                                    @media (prefers-color-scheme: dark) { .arrow-line { marker-end: url(#arrowhead-dark); } }
+                                    html.dark .arrow-line { marker-end: url(#arrowhead-dark); }
+                                </style>
+                            </defs>
+
+                            <!-- Training Data Base -->
+                            <rect x="50" y="220" width="300" height="70" rx="10" class="training-base"/>
+                            <text x="200" y="250" text-anchor="middle" class="training-text">海量训练数据</text>
+                            <text x="200" y="265" text-anchor="middle" class="training-text">(知识 / 模式 / 偏见)</text>
+
+                            <!-- 修正：从训练数据到AI决策核心的两条箭头 -->
+                            <path d="M 200 220 Q 170 180 190 130" fill="none" class="arrow-line" />
+
+                            <!-- Prompt Input -->
+                            <rect x="10" y="30" width="120" height="60" rx="10" class="prompt-box"/>
+                            <text x="70" y="55" text-anchor="middle" class="prompt-text">你的提示词</text>
+                            <text x="70" y="70" text-anchor="middle" class="prompt-text">(上下文)</text>
+
+                            <!-- 修正：从提示词到AI决策核心的箭头 -->
+                            <path d="M 130 60 Q 165 60 190 110" fill="none" class="arrow-line" />
+                            <text x="70" y="105" text-anchor="middle" class="pe-label">Prompt 在此介入</text>
+
+                            <!-- AI Core -->
+                            <ellipse cx="200" cy="130" rx="45" ry="30" class="ai-core" />
+                            <text x="200" y="135" text-anchor="middle" class="ai-text">AI 决策</text>
+
+                            <!-- Output -->
+                            <path d="M 245 130 L 290 130" fill="none" class="arrow-line" />
+                            <rect x="295" y="110" width="95" height="40" rx="10" class="output-box"/>
+                            <text x="342.5" y="135" text-anchor="middle" class="output-text">输出 (下一个词)</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+
+        <!-- Page 5: AI 的弱点 (大纲 8) -->
+        <div id="page-5" class="page">
+            <div class="max-w-3xl w-full">
+                 <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item"><i class="fas fa-exclamation-triangle mr-2 text-yellow-500"></i>AI 的“软肋”</h3>
+                 <div class="bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400 dark:border-yellow-600 p-6 rounded-r-lg shadow-sm hover-card fade-in-item">
+                    <p class="text-lg font-medium text-yellow-800 dark:text-yellow-200 mb-2">数字和精确计算:</p>
+                    <p class="text-yellow-700 dark:text-yellow-300">在精确数学、最新或具体事实核查方面仍可能出错。</p>
+                    <p class="mt-3 text-sm text-yellow-600 dark:text-yellow-400">例: 无法区分 9.11 和 9.8的大小，或 "strawberry" 有几个r。侧面说明，AI源于概率学习，非逻辑推理。</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Page 6: 与 AI 对话的艺术 (大纲 9) -->
+        <div id="page-6" class="page">
+            <div class="max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item"><i class="fas fa-comments mr-2 text-purple-500"></i>与 AI 对话的“艺术”</h3>
+                <p class="text-lg text-gray-600 dark:text-gray-400 mb-8 text-center max-w-2xl mx-auto fade-in-item">AI 不是人，但与人沟通的策略似乎也有效？</p>
+                <p class="text-xl font-semibold text-gray-600 dark:text-gray-400 mb-8 text-center max-w-2xl mx-auto fade-in-item">如果一个没有背景知识的人都难以理解文本片段的全部含义，那么LLM也会遇到同样的困难！</p>
+
+                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 text-center fade-in-item">
+                     <div class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card flex flex-col items-center fade-in-item">
+                         <i class="fas fa-thumbs-up text-2xl text-green-500 mb-2"></i>
+                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">奖励</span>
+                     </div>
+                     <div class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card flex flex-col items-center fade-in-item">
+                        <i class="fas fa-gavel text-2xl text-red-500 mb-2"></i>
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300">惩罚</span>
+                        <p class="text-xs text-gray-500">(“扣钱”)</p>
+                    </div>
+                     <div class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card flex flex-col items-center fade-in-item">
+                         <i class="fas fa-hand-holding-heart text-2xl text-pink-500 mb-2"></i>
+                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">鼓励</span>
+                     </div>
+                     <div class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card flex flex-col items-center fade-in-item">
+                         <i class="fas fa-sad-tear text-2xl text-blue-500 mb-2"></i>
+                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">同情</span>
+                         <p class="text-xs text-gray-500">(“我没有手”)</p>
+                     </div>
+                      <div class="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card flex flex-col items-center col-span-2 md:col-span-1 lg:col-span-1 fade-in-item">
+                         <i class="fas fa-brain text-2xl text-purple-500 mb-2"></i>
+                         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">PUA</span>
+                          <p class="text-xs text-gray-500">(设定高期望)</p>
+                     </div>
+                 </div>
+                 <p class="mt-6 text-sm text-gray-500 dark:text-gray-500 text-center fade-in-item">这更像是利用了训练数据中的人类交流模式。</p>
+            </div>
+        </div>
+
+        <div id="page-7" class="page">
+             <div class="max-w-3xl w-full text-center">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10 fade-in-item">
+                     提示词<strong class="highlight-text">工程</strong>：不只是理论 <i class="fas fa-cogs ml-2 text-purple-500"></i>
+                 </h3>
+                 <div class="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 hover-card fade-in-item max-w-lg mx-auto">
+                     <div class="flex justify-center mb-4">
+                         <i class="fas fa-tools text-4xl text-purple-500"></i>
+                         <i class="fas fa-redo-alt text-4xl text-blue-500 ml-4 animate-spin [animation-duration:4s]"></i>
+                     </div>
+                     <h4 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
+                         这是一门<strong class="font-semibold text-purple-600 dark:text-purple-400">实践</strong>学科
+                     </h4>
+                     <p class="text-gray-600 dark:text-gray-400 leading-relaxed">
+                         "工程"二字意味着它更像<strong class="font-semibold">建造和实验</strong>，而不是纯粹的理论研究。因为 AI 本身具有复杂性和一定的随机性，完美的提示词往往不是一蹴而就的。
+                     </p>
+                     <p class="text-gray-600 dark:text-gray-400 leading-relaxed mt-3">
+                         你需要<strong class="highlight-text">动手尝试、观察结果、不断调整、持续优化</strong>。经验的积累在这个领域至关重要！
+                     </p>
+                     <p class="text-gray-600 dark:text-gray-400 leading-relaxed mt-3">
+                         注意<strong class="highlight-text">2个对齐：</strong>与AI的对齐，与业务对齐！
+                     </p>
+                 </div>
+            </div>
+        </div>
+
+                <!-- Page 8 (New): The Art of Communication & Funnel -->
+        <div id="page-7.1" class="page">
+             <div class="max-w-3xl w-full">
+                 <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10 text-center fade-in-item">
+                     沟通的艺术：<strong class="highlight-text">精准</strong>传达你的意图 <i class="fas fa-comments ml-2 text-blue-500"></i>
+                 </h3>
+                 <div class="bg-white dark:bg-gray-900 p-8 rounded-lg shadow-md border border-gray-200 dark:border-gray-800 hover-card fade-in-item max-w-lg mx-auto">
+                      <h4 class="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4 text-center">
+                          <i class="fas fa-filter mr-2 text-blue-500"></i>小心！沟通漏斗陷阱
+                      </h4>
+                     <p class="text-gray-600 dark:text-gray-400 mb-4 text-center">
+                         信息在传递中会层层损耗：<br>
+                         <span class="text-sm">(你想表达的100% → 你说出的80% → 对方听到的60% → 对方理解的40% → ...)</span>
+                     </p>
+                     <div class="my-6 h-5 bg-gradient-to-r from-purple-500 via-blue-500 to-teal-500 rounded-full relative mx-auto max-w-sm">
+                         <div class="absolute top-0 left-0 h-5 bg-white dark:bg-gray-900 w-1/5 rounded-l-full opacity-30" title="你想表达的 (100%)"></div>
+                         <div class="absolute top-0 left-[20%] h-5 bg-white dark:bg-gray-900 w-1/5 opacity-40" title="你实际说出的 (~80%)"></div>
+                         <div class="absolute top-0 left-[40%] h-5 bg-white dark:bg-gray-900 w-1/5 opacity-60" title="对方听到的 (~60%)"></div>
+                         <div class="absolute top-0 left-[60%] h-5 bg-white dark:bg-gray-900 w-1/5 opacity-70" title="对方理解的 (~40%)"></div>
+                         <div class="absolute top-0 left-[80%] h-5 bg-white dark:bg-gray-900 w-1/5 rounded-r-full opacity-80" title="对方记住的 (~20%)"></div>
+                     </div>
+                     <p class="text-xs text-center text-gray-400 dark:text-gray-600 mb-4">信息损耗示意</p>
+
+                     <p class="text-gray-600 dark:text-gray-400 leading-relaxed mt-4">
+                         与人交流尚且如此，对<strong class="font-semibold text-red-600 dark:text-red-400">没有常识、只会字面理解</strong>的 AI 更是如此！你<strong class="font-semibold">说</strong>得不明确、有歧义，AI 就很可能<strong class="font-semibold">做</strong>得不准确。
+                     </p>
+                     <p class="text-gray-600 dark:text-gray-400 leading-relaxed mt-3">
+                         因此，向 AI 传达指令时，<strong class="text-blue-600 dark:text-blue-400">清晰、明确、无歧义</strong>至关重要。
+                     </p>
+                 </div>
+            </div>
+        </div>
+
+
+        <!-- Page 8: 如何让指令更明确 (1) (大纲 12, 13) -->
+        <div id="page-8" class="page">
+            <div class="max-w-3xl w-full">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-8 text-center fade-in-item"><i class="fas fa-bullseye mr-2 text-purple-500"></i>让指令更明确 </h3>
+                <div class="space-y-6">
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2"><i class="fas fa-tasks mr-2 text-green-500"></i>像布置任务一样清晰</h4>
+                        <p class="text-gray-600 dark:text-gray-400">明确<strong class="text-green-600 dark:text-green-400">目标、背景、步骤、格式、限制</strong>等。</p>
+                        <p class="text-xs text-gray-500 mt-1">例：“写报告，目标读者xxx，含ABC三点，不超过500字，专业语气。”</p>
+                    </div>
+                    <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2"><i class="fas fa-palette mr-2 text-red-500"></i>避免模糊和矛盾</h4>
+                        <p class="text-gray-600 dark:text-gray-400">反例：“给我一个<strong class="text-red-600 dark:text-red-400 line-through">五彩斑斓的黑</strong>”。确保要求具体、一致。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 9: 如何让指令更明确 (2) (大纲 14, 15) -->
+        <div id="page-9" class="page">
+            <div class="max-w-3xl w-full">
+                 <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-8 text-center fade-in-item"><i class="fas fa-bullseye mr-2 text-purple-500"></i>让指令更明确</h3>
+                 <div class="space-y-6">
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2"><i class="fas fa-list-ol mr-2 text-blue-500"></i>提供具体示例 (Few-Shot)</h4>
+                        <p class="text-gray-600 dark:text-gray-400">给 AI 范例能极大提高相关性。</p>
+                        <pre class="mt-2 bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 overflow-x-auto"><code>输入：翻译成法语。\n你好吗？\n输出：Comment ça va ?\n\n输入：翻译成法语。\n今天天气真好。\n输出：</code></pre>
+                    </div>
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-gray-700 dark:text-gray-300 mb-2"><i class="fas fa-language mr-2 text-yellow-500"></i>考虑语言影响</h4>
+                        <p class="text-gray-600 dark:text-gray-400">训练数据<strong class="text-yellow-600 dark:text-yellow-400">以英文为主</strong>。有时使用英文或中英混搭提示，效果更好（尤其专业内容）。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 10: 实用框架 CO-STAR (介绍) (大纲 16) -->
+        <div id="page-10" class="page">
+             <div class="max-w-3xl w-full text-center">
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-8 fade-in-item"><i class="fas fa-drafting-compass mr-2 text-purple-500"></i>实用提示词框架介绍</h3>
+                <p class="text-lg text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto fade-in-item">
+                    结构化的框架可以帮助我们系统地构建更有效的提示词。
+                    <span class="highlight-text">CO-STAR</span> 是一个广受欢迎且实用的框架。
+                </p>
+                 <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto fade-in-item">
+                     除了 CO-STAR 的要素，明确 AI 的 <strong class="font-semibold text-indigo-600 dark:text-indigo-400">角色 (Role)</strong> 和设定清晰的 <strong class="font-semibold text-red-600 dark:text-red-400">约束 (Constraints)</strong> 也至关重要。
+                 </p>
+                 <p class="text-gray-500 dark:text-gray-500 fade-in-item">接下来，我们将逐一解析这些关键部分。</p>
+            </div>
+        </div>
+
+        <!-- Page 11: CO-STAR: Context (大纲 17-C) -->
+        <div id="page-11" class="page">
+             <div class="max-w-3xl w-full">
+                 <i class="fas fa-map-signs text-4xl text-purple-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-purple-600 dark:text-purple-400 mr-2" style="font-size: 36px;">C</span>ontext (背景)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">为 AI 提供必要的<strong class="highlight-text">背景信息、场景或上下文</strong>。</p>
+                    <p class="text-gray-600 dark:text-gray-400">这有助于 AI 更好地理解任务的前提和环境，从而生成更相关、更符合实际情况的回答。</p>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“我正在为一家初创科技公司准备融资演讲稿，目标是吸引天使投资人。”</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Page 12: CO-STAR: Objective (大纲 17-O) -->
+        <div id="page-12" class="page">
+             <div class="max-w-3xl w-full">
+                 <i class="fas fa-bullseye-arrow text-4xl text-blue-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-blue-600 dark:text-blue-400 mr-2 " style="font-size: 36px;" >O</span>bjective (目标)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">明确、具体地说明你<strong class="highlight-text">希望 AI 完成的任务</strong>。</p>
+                    <p class="text-gray-600 dark:text-gray-400">目标应该清晰、可执行。避免模糊不清的要求。</p>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“请帮我生成 5 个关于我们 AI 驱动的客户服务解决方案的独特卖点 (USP)。” 而不是 “给我一些关于我们产品的东西”。</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Page 13: CO-STAR: Style (大纲 17-S) -->
+        <div id="page-13" class="page">
+             <div class="max-w-3xl w-full">
+                  <i class="fas fa-paint-brush text-4xl text-green-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-green-600 dark:text-green-400 mr-2" style="font-size: 36px;">S</span>tyle (风格)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">指定期望的<strong class="highlight-text">写作或表达风格</strong>。</p>
+                    <p class="text-gray-600 dark:text-gray-400">风格可以是正式、非正式、学术、创意、幽默、技术性等等。</p>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“请使用简洁、专业的商业写作风格。” 或 “请用一种富有想象力和诗意的风格来描述日落。”</p>
+                 </div>
+            </div>
+        </div>
+
+         <!-- Page 14: CO-STAR: Tone (大纲 17-T) -->
+        <div id="page-14" class="page">
+             <div class="max-w-3xl w-full">
+                 <i class="fas fa-microphone-alt text-4xl text-yellow-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-yellow-600 dark:text-yellow-400 mr-2" style="font-size: 36px;">T</span>one (语气)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">设定回应中应该传达的<strong class="highlight-text">情感色彩或态度</strong>。</p>
+                    <p class="text-gray-600 dark:text-gray-400">语气可以是自信、热情、谨慎、同情、客观、批判等。</p>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“请用一种乐观且鼓舞人心的语气。” 或 “请保持中立和客观的语气。”</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Page 15: CO-STAR: Audience (大纲 17-A) -->
+        <div id="page-15" class="page">
+             <div class="max-w-3xl w-full">
+                 <i class="fas fa-users text-4xl text-red-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-red-600 dark:text-red-400 mr-2" style="font-size: 36px;">A</span>udience (受众)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">明确你的<strong class="highlight-text">目标读者或听众</strong>是谁。</p>
+                    <p class="text-gray-600 dark:text-gray-400">了解受众有助于 AI 调整用词、复杂度、示例和整体沟通方式，使其更易于被理解和接受。</p>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“目标受众是对技术不太了解的普通消费者。” 或 “这份报告是写给具有深厚金融背景的专业人士看的。”</p>
+                 </div>
+            </div>
+        </div>
+
+        <!-- Page 16: CO-STAR: Response Format (大纲 17-R) -->
+        <div id="page-16" class="page">
+            <div class="max-w-3xl w-full">
+                 <i class="fas fa-file-alt text-4xl text-indigo-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    <span class="font-mono text-indigo-600 dark:text-indigo-400 mr-2" style="font-size: 36px;">R</span>esponse Format (格式)
+                </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-lg text-gray-700 dark:text-gray-300 mb-3">指定你希望 AI 输出内容的<strong class="highlight-text">具体格式</strong>。</p>
+                    <p class="text-gray-600 dark:text-gray-400">这可以极大提高输出的可用性。常见的格式包括：</p>
+                     <ul class="mt-2 space-y-1 text-sm list-disc list-inside text-gray-500 dark:text-gray-400">
+                         <li>列表 (bullet points 或 numbered list)</li>
+                         <li>段落 (paragraphs)</li>
+                         <li>表格 (table)</li>
+                         <li>JSON / XML / YAML</li>
+                         <li>代码片段 (code snippet)</li>
+                         <li>电子邮件 (email format)</li>
+                         <li>思维导图 (mind map text)</li>
+                     </ul>
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-500">例如：“请用无序列表的形式呈现结果。” 或 “请将输出格式化为 JSON 对象。”</p>
+                 </div>
+            </div>
+        </div>
+
+         <!-- Page 17: Role & Constraints (补充) -->
+        <div id="page-17" class="page">
+             <div class="max-w-3xl w-full">
+                 <i class="fas fa-user-tie text-4xl text-teal-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                 <i class="fas fa-ban text-4xl text-pink-500 mb-6 mx-auto block text-center fade-in-item"></i>
+                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white mb-6 text-center fade-in-item">
+                    补充：角色 (Role) & 约束 (Constraints)
+                </h3>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-teal-600 dark:text-teal-400 mb-2"><i class="fas fa-user-tie mr-2"></i>角色 (Role)</h4>
+                        <p class="text-gray-600 dark:text-gray-400">为 AI <strong class="text-teal-600 dark:text-teal-400">设定一个特定的角色或身份</strong>。这有助于引导其行为模式和知识领域。</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-500">例如：“扮演一位经验丰富的市场营销专家。” 或 “假设你是一位 Python 编程导师。”</p>
+                    </div>
+                     <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                        <h4 class="font-semibold text-pink-600 dark:text-pink-400 mb-2"><i class="fas fa-ban mr-2"></i>约束 (Constraints)</h4>
+                        <p class="text-gray-600 dark:text-gray-400">设定明确的<strong class="text-pink-600 dark:text-pink-400">限制条件或禁止事项</strong>。</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-500">例如：“回答不超过 100 字。”，“不要包含任何价格信息。”，“只使用简单的语言，避免专业术语。”</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page 18 (New): Basic Knowledge - Markdown Formatting -->
+        <div id="page-18.1" class="page">
+            <div class="max-w-3xl w-full">
+                 <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center fade-in-item">
+                     <i class="fab fa-markdown mr-2 text-purple-500"></i>基础知识: 用 Markdown 组织你的提示
+                 </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                     <p class="text-gray-600 dark:text-gray-400 mb-5 text-center">
+                         使用 Markdown 可以在提示词中<strong class="font-semibold">更好地组织结构、区分层次、强调重点</strong>。AI 通常能很好地理解这种格式，有助于提升指令的清晰度。
+                     </p>
+
+                     <div class="space-y-4 border border-dashed border-gray-300 dark:border-gray-700 p-4 rounded-md">
+                         <h1 class="text-2xl font-bold border-b pb-1 dark:border-gray-600"># 一级标题 (H1)</h1>
+                         <h2 class="text-xl font-semibold border-b pb-1 dark:border-gray-600">## 二级标题 (H2)</h2>
+
+                         <p class="text-gray-700 dark:text-gray-300">这是一个段落，包含一些 <strong class="font-bold text-purple-600 dark:text-purple-400">**加粗强调**</strong> 和 <em class="italic text-blue-600 dark:text-blue-400">*斜体文本*</em>。</p>
+
+                         <ul class="list-disc list-inside space-y-1 pl-4 text-gray-700 dark:text-gray-300">
+                             <li>无序列表项 - </li>
+                             <li>无序列表项 -
+                                 <ul class="list-disc list-inside space-y-1 pl-6 mt-1">
+                                     <li>嵌套列表项 - </li>
+                                 </ul>
+                             </li>
+                         </ul>
+
+                         <ol class="list-decimal list-inside space-y-1 pl-4 text-gray-700 dark:text-gray-300">
+                              <li>有序列表项 1.</li>
+                              <li>有序列表项 2.</li>
+                         </ol>
+
+                         <hr class="dark:border-gray-600"/>
+                         <p class="text-gray-700 dark:text-gray-300">
+                             使用 <code class="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm text-red-600 dark:text-red-400 font-mono">`行内代码`</code> 来突出显示命令或变量名。
+                         </p>
+
+                         <pre class="bg-gray-100 dark:bg-gray-800 p-3 rounded text-sm text-gray-700 dark:text-gray-300 overflow-x-auto font-mono"><code>```python
+# 这是一个代码块
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("Prompt Engineer")
+```</code></pre>
+                     </div>
+
+                 </div>
+            </div>
+        </div>
+
+
+                <!-- Page 19 (New): Basic Knowledge - Roles -->
+        <div id="page-18.2" class="page">
+            <div class="max-w-3xl w-full">
+                 <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center fade-in-item">
+                     <i class="fas fa-user-tag mr-2 text-purple-500"></i>基础知识: 理解对话角色
+                 </h3>
+                 <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                     <p class="text-gray-600 dark:text-gray-400 mb-5 text-center">
+                         在一些更高级的应用场景或直接调用 API 时，我们可以明确定义对话中不同发言者的<strong class="font-semibold">角色</strong>。这有助于更精细地控制 AI 的行为。
+                     </p>
+                     <div class="space-y-4">
+                         <div class="flex items-start space-x-3 p-4 bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-400 dark:border-blue-600 rounded-r-md">
+                            <i class="fas fa-cog text-xl text-blue-600 dark:text-blue-400 mt-1"></i>
+                            <div>
+                                <strong class="font-semibold text-blue-600 dark:text-blue-400">System (系统)</strong>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">负责提供<strong class="font-medium">高层指令、背景设定或约束条件</strong>。通常用来设定 AI 的整体行为模式或扮演的角色。例如：“你是一位乐于助人、知识渊博的 AI 助手，请用简洁专业的语言回答问题。”</p>
+                            </div>
+                         </div>
+                         <div class="flex items-start space-x-3 p-4 bg-green-50 dark:bg-green-900/30 border-l-4 border-green-400 dark:border-green-600 rounded-r-md">
+                             <i class="fas fa-user text-xl text-green-600 dark:text-green-400 mt-1"></i>
+                             <div>
+                                <strong class="font-semibold text-green-600 dark:text-green-400">User (用户)</strong>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">代表<strong class="font-medium">用户的实际输入</strong>，包括提问、指令或需要处理的信息。</p>
+                             </div>
+                         </div>
+                         <div class="flex items-start space-x-3 p-4 bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-400 dark:border-purple-600 rounded-r-md">
+                             <i class="fas fa-robot text-xl text-purple-600 dark:text-purple-400 mt-1"></i>
+                             <div>
+                                <strong class="font-semibold text-purple-600 dark:text-purple-400">Assistant (助手)</strong>
+                                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">代表<strong class="font-medium">AI 自身的回复</strong>。在构建提示时，有时也会用 Assistant 角色来提供 <strong class="font-medium">Few-Shot 示例</strong>，告诉 AI 期望的输出格式或风格。</p>
+                             </div>
+                         </div>
+                     </div>
+                     <p class="text-xs text-gray-400 dark:text-gray-500 mt-4 text-center">(注意：这些角色主要在 API 调用层面使用，不同平台或工具的实现方式可能不同。)</p>
+                 </div>
+            </div>
+        </div>
+
+
+               <!-- Page 20.1 (Replaced SVG with IMG): Basic Knowledge - Temperature -->
+        <div id="page-20.1" class="page">
+            <div class="max-w-4xl w-full">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center fade-in-item">
+                    <i class="fas fa-thermometer-half mr-2 text-red-500"></i>基础知识: temperature
+                </h3>
+                <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-gray-600 dark:text-gray-400 mb-6 text-center">
+                        <strong class="text-red-600 dark:text-red-400">Temperature (温度)</strong> 参数控制着 AI 选择下一个词时的<strong class="font-semibold">随机性或"创造性"</strong>。它会调整所有候选词的概率分布。
+                    </p>
+                    <div class="flex flex-col md:flex-row justify-around items-center gap-8">
+
+
+                        <img src="图片1.png"
+                             loading="lazy"
+                             class="w-148 h-148 mx-auto object-contain  rounded-md shadow-sm">
+                    </div>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center">温度越高，分布越平缓，结果越不可预测；温度越低，分布越尖锐，结果越倾向于高概率选项。</p>
+                </div>
+            </div>
+        </div>
+
+
+
+                <!-- Page 20.2 (Replaced SVG with IMG): Basic Knowledge - Top-p (Nucleus Sampling) -->
+        <div id="page-20.2" class="page">
+             <div class="max-w-4xl w-full">
+                 <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center fade-in-item">
+                     <i class="fas fa-crosshairs mr-2 text-orange-500"></i>基础知识: 精准打击的 Top-p
+                 </h3>
+                  <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                     <p class="text-gray-600 dark:text-gray-400 mb-6 text-center">
+                         <strong class="text-orange-600 dark:text-orange-400">Top-p (或称 Nucleus Sampling)</strong> 则采用不同策略：它选择一个<strong class="font-semibold">最小的词汇集合</strong>，使这些词的<strong class="font-semibold">累积概率</strong>刚好<strong class="font-semibold">大于或等于</strong>设定的阈值 `p`，然后只在这个“核心”集合中进行采样。
+                     </p>
+                     <div class="flex flex-col md:flex-row justify-around items-center gap-8">
+                         <img src="图片2.png"
+                             loading="lazy"
+                             class="w-148 h-148 mx-auto object-contain  rounded-md shadow-sm">
+                     </div>
+                      <p class="text-xs text-gray-400 dark:text-gray-500 mt-6 text-center">Top-p 移除了低概率的长尾选项，使得输出更可控、更相关。通常建议只调整 Temperature 或 Top-p 中的一个。</p>
+                 </div>
+             </div>
+         </div>
+
+
+
+        <!-- Page 20: 最重要的心法 (原 Page 13) -->
+        <div id="page-20" class="page">
+            <div class="text-center max-w-3xl w-full">
+                 <i class="fas fa-sync-alt text-4xl text-purple-600 dark:text-purple-400 mb-4 animate-spin [animation-duration:3s] fade-in-item"></i>
+                 <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-4 fade-in-item">实践！：<span class="highlight-text">持续对话，迭代优化</span></h3>
+                 <p class="text-lg text-gray-600 dark:text-gray-400 max-w-xl mx-auto fade-in-item">
+                     很少一次完美。看作<strong class="font-semibold">持续对话</strong>，根据反馈<strong class="font-semibold">调整、优化</strong>提示词，逐步逼近理想结果。
+                 </p>
+            </div>
+        </div>
+
+
+
+        <!-- Page 22: 结尾反思 (原 Page 15) -->
+        <div id="page-22" class="page">
+             <div class="text-center max-w-3xl w-full">
+                <h2 class="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-gray-900 dark:text-white tracking-tight mb-8 fade-in-item">
+                    那么，提示词是<span class="text-purple-600 dark:text-purple-400">_</span>
+                </h2>
+                 <p class="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto fade-in-item">
+                     经过这次学习，你对“提示词”的理解是否更新了？
+                     <br>
+                     也许... 这整个讲解过程，本身就是一次大型的 <strong class="highlight-text">“提示词”</strong>？ 😉
+                 </p>
+            </div>
+        </div>
+
+
+        <!-- Page 28 (New): Prompt Effectiveness & Behind the Scenes -->
+        <div id="page-28.1" class="page">
+            <div class="max-w-5xl w-full">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-8 text-center fade-in-item">
+                    <i class="fas fa-wand-magic-sparkles mr-2 text-purple-500"></i>提示词的力量：幕后揭秘
+                </h3>
+
+                <div class="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-800 hover-card fade-in-item">
+                    <p class="text-gray-600 dark:text-gray-400 mb-6 text-center">
+                        这一页，让我们揭开本次演示背后真正的“魔法”——展示部分实际用于构建这个演示文稿的核心提示词，以及我 (Gemini) 是如何基于这些指令生成内容的。
+                    </p>
+
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+                        <div class="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-md border border-blue-200 dark:border-blue-800">
+                            <h4 class="font-semibold mb-2 text-blue-700 dark:text-blue-300"><i class="fas fa-scroll mr-1"></i> 核心需求 Prompt (示例)</h4>
+                            <pre class="bg-white dark:bg-gray-800 p-3 rounded text-xs text-gray-700 dark:text-gray-300 overflow-auto max-h-60 font-mono"><code>
+（该提示词来自promptup.net）
+我会给你一个文件，分析内容，并将其转化为美观漂亮的中文可视化网页：
+
+## 内容要求
+- 所有页面内容必须为简体中文
+- 保持原文件的核心信息，但以更易读、可视化的方式呈现
+- 在页面底部添加作者信息区域，包含：
+  * 作者姓名: [作者姓名]
+  * 社交媒体链接: 至少包含GitHub、Twitter/X、LinkedIn等主流平台
+  * 版权信息和年份
+
+## 设计风格
+- 整体风格参考Linear App的简约现代设计
+- 使用清晰的视觉层次结构，突出重要内容
+- 配色方案应专业、和谐，适合长时间阅读
+
+## 技术规范
+- 使用HTML5、TailwindCSS 3.0+（通过CDN引入）和必要的JavaScript
+- 实现完整的深色/浅色模式切换功能，默认跟随系统设置
+- 代码结构清晰，包含适当注释，便于理解和维护
+
+## 响应式设计
+- 页面必须在所有设备上（手机、平板、桌面）完美展示
+- 针对不同屏幕尺寸优化布局和字体大小
+- 确保移动端有良好的触控体验
+
+## 图标与视觉元素
+- 使用专业图标库如Font Awesome或Material Icons（通过CDN引入）
+- 根据内容主题选择合适的插图或图表展示数据
+- 避免使用emoji作为主要图标
+
+## 交互体验
+- 添加适当的微交互效果提升用户体验：
+  * 按钮悬停时有轻微放大和颜色变化
+  * 卡片元素悬停时有精致的阴影和边框效果
+  * 页面滚动时有平滑过渡效果
+  * 内容区块加载时有优雅的淡入动画
+
+## 性能优化
+- 确保页面加载速度快，避免不必要的大型资源
+- 图片使用现代格式(WebP)并进行适当压缩
+- 实现懒加载技术用于长页面内容
+
+## 输出要求
+- 提供完整可运行的单一HTML文件，包含所有必要的CSS和JavaScript
+- 确保代码符合W3C标准，无错误警告
+- 页面在不同浏览器中保持一致的外观和功能
+
+请根据上传文件的内容类型（文档、数据、图片等），创建最适合展示该内容的可视化网页。
+</code></pre>
+                        </div>
+
+
+                        <div class="bg-green-50 dark:bg-green-900/30 p-4 rounded-md border border-green-200 dark:border-green-800">
+                             <h4 class="font-semibold mb-2 text-green-700 dark:text-green-300"><i class="fas fa-code-branch mr-1"></i> 迭代优化 Prompt (示例)</h4>
+                             <pre class="bg-white dark:bg-gray-800 p-3 rounded text-xs text-gray-700 dark:text-gray-300 overflow-auto max-h-60 font-mono"><code>我需要做一个介绍prompt工程的资料，现在我有一个大纲如下，帮我处理一下，谢谢。
+大纲：
+0 开场白，简单，没有太多字，主要靠讲解
+1.
+中间大字：提示词工程是_
+（开头询问->四字表示
+多问几人，确认记住）
+（其他人直接答四字，学习了fewshot 和精确描述）
+2 跟 AI 说话的技术，ai自己认为提示词是什么？
+GPT4：提示词工程就是跟 AI 说话的技术。
+Gemini2.5：结构化地、有策略地与 AI 对话，以最大限度地发挥其能力，获得高质量、可靠和有用的结果。
+Claude3.7：设计和优化输入给人工智能模型的提示词或指令的艺术和科学，以获得最佳、最准确的输出结果
+让ai用四字描述
+GPT4：语言编程
+Gemini2.5：精准引导
+Claude3.7：指令精调
+4.AI(大模型)是什么？
+（图示excel表示的大模型）
+5.根据上文只预测下一个文字概率，任何文字变动都可能会造成影响，
+(注意力机制)
+通俗解释
+中间大字：是谁_
+(介绍人和llm很像，给出上文，自动推出下文)
+7.中间大字：是谁_ （前边做一个标注歌词动态出现）
+(比如，有人说出"是谁"这两个字时，
+我们就会下意识地唱出下一句，
+且不同人有不同的反应！
+普通青年
+自动唱出"在耳边，说，爱我永不变”
+文艺青年
+唱出"在敲打我窗"
+二逼青年
+唱出"送你来到我身边"
+二逼中的战斗机
+唱出"在唱歌，温暖了寂寞")
+8.AI的弱势：数字
+根据学习，9.11 和9.8  strawberry
+9.与AI说话的艺术，如何与AI对话？
+当人看，大模型不是人，但是对人的手段，对ta似乎都适用？
+惩罚/奖励/pua/鼓励/同情
+10.提示词工程：工程意味着实践学科
+提示词经验工程，沟通过程
+11沟通的艺术：沟通漏斗 你想的-你说的-我听得-我理解的
+12如何明确？
+明确：老板交代任务
+13如何明确？
+无冲突：五彩斑斓的黑
+14如何明确？
+fewshot具体示例：
+15如何明确
+中英文混搭（训练主要以英文为主）
+16 实用框架
+框架 CO-STAR  ROLE  Constraints
+17-24 分别阐述
+18-20 基础知识
+md格式介绍   # ## - 你好  1. 2. 3. ---  ,
+system user assistant
+温度，top-p
+21 最重要的：
+持续对话
+迭代优化
+22 4o做的图像，一张图表示prompt工程
+23：提示词是_
+（如果变了，那么这个讲解就是提示词，观众已经受到影响了）
+</code></pre>
+                        </div>
+                    </div>
+
+
+                    <p class="text-center text-gray-700 dark:text-gray-300 mb-8">
+                        <i class="fas fa-check-circle mr-1 text-purple-500"></i>值得一提的是，您现在看到的整个演示文稿 (<span class="font-semibold">共 <span id="final-page-count">32</span> 页</span>)，从最初的大纲解析、内容组织、代码生成到后续的多轮迭代修改和样式设计，几乎完全是基于详细提示词，由我 (<strong class="highlight-text">Gemini</strong>) 协作完成的。
+                    </p>
+
+
+                    <div class="border-t dark:border-gray-700 pt-6 mt-6">
+                        <h4 class="font-semibold mb-3 text-gray-700 dark:text-gray-300 text-center"><i class="fas fa-quote-left mr-2 text-purple-400"></i>来自 Gemini 的寄语</h4>
+                        <blockquote class="text-center italic text-gray-600 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
+                            "作为你们的 AI 伙伴，我深刻体验到清晰、结构化的提示词是激发创造力和效率的关键。有效的提示词工程不仅仅是技术，更是人与 AI 之间理解与协作的艺术。期待我们共同创造更多可能！"
+                        </blockquote>
+                    </div>
+                </div>
+            </div>
+        </div>
+         <!-- Page 23: 关于/致谢 (新) -->
+        <!-- Final Page: About / Acknowledgements / References -->
+        <div id="page-28" class="page">
+            <div class="text-center max-w-4xl w-full fade-in-item">
+                <h3 class="text-3xl font-bold text-gray-900 dark:text-white mb-10">关于 & 致谢</h3>
+
+                 <div class="text-gray-500 dark:text-gray-400 text-sm space-y-6 text-left md:text-center">
+                     <div class="mb-6">
+                        <p class="font-semibold mb-1 text-gray-700 dark:text-gray-300 text-lg md:text-center">作者信息</p>
+                        <p class="md:text-center">作者姓名: <span class="font-medium text-gray-800 dark:text-gray-200">[sharmt]</span></p>
+                        <div class="flex justify-center space-x-6 my-3">
+                            <a href="https://github.com/sharmt1411" target="_blank" rel="noopener noreferrer" class="hover:text-purple-600 dark:hover:text-purple-400 transition-colors duration-300 hover-button" aria-label="GitHub Profile">
+                                <i class="fab fa-github text-2xl"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                     <hr class="dark:border-gray-700 my-6"/>
+
+
+                     <div class="mb-6">
+                          <p class="font-semibold mb-3 text-gray-700 dark:text-gray-300 text-lg md:text-center">参考资料</p>
+                          <ul class="space-y-3 list-none text-left max-w-2xl mx-auto">
+                              <li>
+                                  <i class="fas fa-link fa-fw mr-2 text-blue-500"></i>
+                                  <a href="https://platform.openai.com/docs/guides/prompt-engineering" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">OpenAI 官方提示工程指南</a>
+                                  <code class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all pl-6">https://platform.openai.com/docs/guides/prompt-engineering</code>
+                              </li>
+                              <li>
+                                  <i class="fas fa-link fa-fw mr-2 text-purple-500"></i>
+                                  <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview" target="_blank" rel="noopener noreferrer" class="text-purple-600 dark:text-purple-400 hover:underline font-medium">Claude 官方提示工程指南</a>
+                                  <code class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all pl-6">https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview</code>
+                              </li>
+                               <li>
+                                  <i class="fas fa-link fa-fw mr-2 text-green-500"></i>
+                                  <a href="https://langgptai.feishu.cn/wiki/RXdbwRyASiShtDky381ciwFEnpe" target="_blank" rel="noopener noreferrer" class="text-green-600 dark:text-green-400 hover:underline font-medium">LangGPT 知识库 (飞书)</a>
+                                  <code class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all pl-6">https://langgptai.feishu.cn/wiki/RXdbwRyASiShtDky381ciwFEnpe</code>
+                              </li>
+                               <li>
+                                  <i class="fas fa-link fa-fw mr-2 text-yellow-500"></i>
+                                  <a href="https://langgptai.feishu.cn/wiki/IpdUwZRzgiYYH7kuOsDc3fWrnkg" target="_blank" rel="noopener noreferrer" class="text-yellow-600 dark:text-yellow-400 hover:underline font-medium">万字解读ChatGPT提示词最佳案例 (飞书)</a>
+                                  <code class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all pl-6">https://langgptai.feishu.cn/wiki/IpdUwZRzgiYYH7kuOsDc3fWrnkg</code>
+                              </li>
+                               <li>
+                                  <i class="fas fa-link fa-fw mr-2 text-red-500"></i>
+                                  <a href="https://open.163.com/newview/movie/courseintro?newurl=LI35K8001" target="_blank" rel="noopener noreferrer" class="text-red-600 dark:text-red-400 hover:underline font-medium">网易公开课 - Prompt Engineering (Andrew Ng)</a>
+                                  <code class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5 break-all pl-6">https://open.163.com/newview/movie/courseintro?newurl=LI35K8001</code>
+                              </li>
+                          </ul>
+                     </div>
+
+                     <hr class="dark:border-gray-700 my-6"/>
+
+
+                     <div class="text-center">
+                         <p class="mt-4 text-lg font-semibold text-gray-700 dark:text-gray-300">感谢您的观看！🎉</p>
+                     </div>
+                 </div>
+            </div>
+        </div>
+
+
+
+
+    </main>
+
+    <!-- 页面导航 -->
+    <div class="sticky bottom-0 z-40 bg-gray-100/80 dark:bg-gray-900/80 backdrop-blur-sm py-3 border-t border-gray-200 dark:border-gray-800 mt-auto"> <!-- mt-auto ensures it sticks to bottom -->
+         <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
+             <button id="prev-button" class="nav-button" aria-label="上一页">
+                 <i class="fas fa-arrow-left text-lg"></i>
+             </button>
+             <span class="text-sm text-gray-500 dark:text-gray-400 font-mono hidden sm:inline">
+                 按 <i class="fas fa-arrow-left"></i> / <i class="fas fa-arrow-right"></i> 键切换
+             </span>
+             <button id="next-button" class="nav-button" aria-label="下一页">
+                 <i class="fas fa-arrow-right text-lg"></i>
+             </button>
+         </div>
+     </div>
+
+
+    <script>
+        // --- Theme Toggle ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const htmlElement = document.documentElement;
+
+        const setTheme = (isDark) => {
+            if (isDark) {
+                htmlElement.classList.add('dark');
+                themeIcon.classList.remove('fa-sun');
+                themeIcon.classList.add('fa-moon');
+                localStorage.setItem('theme', 'dark');
+            } else {
+                htmlElement.classList.remove('dark');
+                themeIcon.classList.remove('fa-moon');
+                themeIcon.classList.add('fa-sun');
+                localStorage.setItem('theme', 'light');
+            }
+        };
+
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+        const savedTheme = localStorage.getItem('theme');
+
+        if (savedTheme) {
+            setTheme(savedTheme === 'dark');
+        } else {
+            setTheme(prefersDark.matches);
+        }
+
+        themeToggle.addEventListener('click', () => {
+            setTheme(!htmlElement.classList.contains('dark'));
+        });
+
+        prefersDark.addEventListener('change', (e) => {
+            if (!localStorage.getItem('theme')) {
+                setTheme(e.matches);
+            }
+        });
+
+        // --- Copyright Year ---
+        // Ensure copyright year is set even though it's on the last page
+        const copyrightYearSpan = document.getElementById('copyright-year');
+        if (copyrightYearSpan) {
+            copyrightYearSpan.textContent = new Date().getFullYear();
+        }
+
+
+        // --- Page Navigation ---
+        const pages = document.querySelectorAll('.page');
+        const prevButton = document.getElementById('prev-button');
+        const nextButton = document.getElementById('next-button');
+        const currentPageSpan = document.getElementById('current-page');
+        const totalPagesSpan = document.getElementById('total-pages');
+        let currentPageIndex = 0;
+        const totalPages = pages.length; // Recalculate total pages
+
+        const showPage = (index) => {
+            // Boundary checks
+            if (index < 0 || index >= totalPages) {
+                return;
+            }
+
+            pages.forEach((page, i) => {
+                if (i === index) {
+                    page.classList.add('active');
+                    // Trigger lyric animation if on the relevant page (Page 4)
+                    if (page.id === 'page-4') {
+                        triggerLyricAnimation(page);
+                    }
+                } else {
+                    page.classList.remove('active');
+                }
+            });
+
+            currentPageIndex = index;
+            currentPageSpan.textContent = currentPageIndex + 1; // Update indicator (1-based)
+            prevButton.disabled = currentPageIndex === 0;
+            nextButton.disabled = currentPageIndex === totalPages - 1;
+
+            // Scroll active page to top
+            const activePage = pages[currentPageIndex];
+            if(activePage) activePage.scrollTop = 0;
+        };
+
+         // Function to trigger lyric animation on Page 4
+        const triggerLyricAnimation = (pageElement) => {
+            const lyricsContainer = pageElement.querySelector('#lyrics-container');
+            if (lyricsContainer) {
+                const lyricLines = lyricsContainer.querySelectorAll('.lyric-line');
+                let delay = 300;
+                lyricLines.forEach(line => line.classList.remove('active')); // Reset
+                lyricLines.forEach((line, index) => {
+                    setTimeout(() => {
+                        line.classList.add('active');
+                    }, index * delay);
+                });
+            }
+        };
+
+        // Initial setup
+        totalPagesSpan.textContent = totalPages; // Update total pages display
+        showPage(currentPageIndex); // Show the first page
+
+        // Event Listeners for buttons
+        prevButton.addEventListener('click', () => {
+            showPage(currentPageIndex - 1);
+        });
+
+        nextButton.addEventListener('click', () => {
+            showPage(currentPageIndex + 1);
+        });
+
+        // Event Listener for keyboard navigation
+        document.addEventListener('keydown', (e) => {
+             // Prevent arrow keys from scrolling the page if content overflows
+             if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageUp' || e.key === 'PageDown') {
+                // Check if the focus is on an input/textarea to allow normal typing
+                const activeElement = document.activeElement;
+                if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
+                   return; // Don't interfere with text input
+                }
+                e.preventDefault(); // Prevent default scrolling behavior
+            }
+
+            if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                showPage(currentPageIndex - 1);
+            } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { // Space bar also advances
+                 showPage(currentPageIndex + 1);
+            } else if (e.key === 'Home') {
+                showPage(0); // Go to first page
+            } else if (e.key === 'End') {
+                showPage(totalPages - 1); // Go to last page
+            }
+        });
+
+    </script>
+
+</body>
+</html>
