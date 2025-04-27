@@ -12,8 +12,8 @@
 
 **相比于提示词工程的内容，这种网页版ppt的生成以及展示方式，更加契合AI生成，同时具备流畅的动画效果以及排版，个人认为是未来展示的发展方向**
 
-[体验地址](https://prompt-sharmt.vercel.app/)
-
+[体验地址](https://sharmt1411.github.io/promptengineer/)
+[体验地址2](https://prompt-sharmt.vercel.app/) 
 ![pic](pic1.png)
 
 
